@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyCellar - Gestione Cantina Personale</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .bottle-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .bottle-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border-color: #667eea;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .category-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .wine { background: #e74c3c; color: white; }
+        .whisky { background: #f39c12; color: white; }
+        .rum { background: #8e44ad; color: white; }
+        .gin { background: #3498db; color: white; }
+        .scotch { background: #d35400; color: white; }
+        
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Mock API Functions - Sostituire con chiamate API reali
+        const searchVivinoAPI = async (query) => {
+            // Simulazione chiamata API Vivino
+            return [
+                {
+                    id: Date.now(),
+                    name: query || "Barolo DOCG",
+                    producer: "Cantina Produttori",
+                    category: "wine",
+                    vintage: 2019,
+                    country: "Italia",
+                    region: "Piemonte",
+                    rating: 4.5,
+                    description: "Elegante e complesso con note di ciliegia, spezie e tabacco",
+                    image: "https://via.placeholder.com/150/8B0000/FFFFFF?text=Barolo",
+                    abv: 14.5
+                }
+            ];
+        };
+
+        const searchSpiritsAPI = async (query, category) => {
+            // Simulazione chiamata API Spirits
+            return [
+                {
+                    id: Date.now(),
+                    name: query || "Lagavulin 16 Year",
+                    producer: "Distillery",
+                    category: category || "whisky",
+                    age: 16,
+                    country: "Scotland",
+                    region: "Islay",
+                    rating: 4.7,
+                    description: "Intenso, torbato con note di iodio e pepe",
+                    image: "https://via.placeholder.com/150/F39C12/FFFFFF?text=Whisky",
+                    abv: 43
+                }
+            ];
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('cellar');
+            const [cellar, setCellar] = useState([]);
+            const [favorites, setFavorites] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [selectedCategory, setSelectedCategory] = useState('wine');
+            const [showAddModal, setShowAddModal] = useState(false);
+
+            // Carica dati da localStorage
+            useEffect(() => {
+                const savedCellar = localStorage.getItem('cellar');
+                const savedFavorites = localStorage.getItem('favorites');
+                if (savedCellar) setCellar(JSON.parse(savedCellar));
+                if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
+            }, []);
+
+            // Salva dati in localStorage
+            useEffect(() => {
+                localStorage.setItem('cellar', JSON.stringify(cellar));
+            }, [cellar]);
+
+            useEffect(() => {
+                localStorage.setItem('favorites', JSON.stringify(favorites));
+            }, [favorites]);
+
+            const handleSearch = async () => {
+                if (selectedCategory === 'wine') {
+                    const results = await searchVivinoAPI(searchQuery);
+                    setSearchResults(results);
+                } else {
+                    const results = await searchSpiritsAPI(searchQuery, selectedCategory);
+                    setSearchResults(results);
+                }
+            };
+
+            const addToCellar = (bottle, purchasePrice, quantity = 1) => {
+                const cellarBottle = {
+                    ...bottle,
+                    cellarId: Date.now(),
+                    purchasePrice: parseFloat(purchasePrice),
+                    currentPrice: parseFloat(purchasePrice) * (1 + Math.random() * 0.3), // Simulazione aumento valore
+                    quantity: parseInt(quantity),
+                    addedDate: new Date().toISOString(),
+                    location: 'Scaffale A1'
+                };
+                setCellar([...cellar, cellarBottle]);
+                setShowAddModal(false);
+            };
+
+            const removeFromCellar = (cellarId) => {
+                setCellar(cellar.filter(b => b.cellarId !== cellarId));
+            };
+
+            const updateQuantity = (cellarId, change) => {
+                setCellar(cellar.map(b => {
+                    if (b.cellarId === cellarId) {
+                        const newQty = Math.max(0, b.quantity + change);
+                        return newQty === 0 ? null : { ...b, quantity: newQty };
+                    }
+                    return b;
+                }).filter(Boolean));
+            };
+
+            const toggleFavorite = (bottle) => {
+                const isFav = favorites.some(f => f.id === bottle.id);
+                if (isFav) {
+                    setFavorites(favorites.filter(f => f.id !== bottle.id));
+                } else {
+                    setFavorites([...favorites, bottle]);
+                }
+            };
+
+            const isFavorite = (bottleId) => {
+                return favorites.some(f => f.id === bottleId);
+            };
+
+            // Calcoli statistiche
+            const totalValue = cellar.reduce((sum, b) => sum + (b.currentPrice * b.quantity), 0);
+            const totalInvestment = cellar.reduce((sum, b) => sum + (b.purchasePrice * b.quantity), 0);
+            const totalReturn = totalValue - totalInvestment;
+            const returnPercentage = totalInvestment > 0 ? ((totalReturn / totalInvestment) * 100) : 0;
+            const totalBottles = cellar.reduce((sum, b) => sum + b.quantity, 0);
+
+            // Suggerimenti abbinamento
+            const getPairingsSuggestions = (bottle) => {
+                const pairings = {
+                    wine: {
+                        red: ["Carne rossa alla griglia", "Formaggi stagionati", "Pasta al ragù", "Brasato"],
+                        white: ["Pesce", "Frutti di mare", "Risotto", "Formaggi freschi"],
+                        sparkling: ["Aperitivo", "Ostriche", "Sushi", "Dessert leggeri"]
+                    },
+                    whisky: ["Cioccolato fondente", "Salmone affumicato", "Formaggi blu", "Carne affumicata"],
+                    rum: ["Dessert al cioccolato", "Sigari", "Frutta tropicale", "Caffè"],
+                    gin: ["Antipasti", "Frutti di mare", "Insalate", "Cocktail"],
+                    scotch: ["Salmone", "Formaggi affumicati", "Carne di selvaggina", "Dark chocolate"]
+                };
+
+                if (bottle.category === 'wine') {
+                    return pairings.wine.red; // Semplificato - si può migliorare con logica per tipo vino
+                }
+                return pairings[bottle.category] || [];
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto">
+                    {/* Header */}
+                    <div className="card rounded-2xl p-6 mb-6 shadow-2xl animate-slide-in">
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+                            <i className="fas fa-wine-bottle mr-3"></i>
+                            MyCellar
+                        </h1>
+                        <p className="text-gray-600">La tua cantina digitale personalizzata</p>
+                    </div>
+
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="stat-card rounded-xl p-6 shadow-lg animate-slide-in">
+                            <div className="text-3xl mb-2"><i className="fas fa-wine-bottle"></i></div>
+                            <div className="text-2xl font-bold">{totalBottles}</div>
+                            <div className="text-sm opacity-90">Bottiglie</div>
+                        </div>
+                        <div className="stat-card rounded-xl p-6 shadow-lg animate-slide-in" style={{animationDelay: '0.1s'}}>
+                            <div className="text-3xl mb-2"><i className="fas fa-euro-sign"></i></div>
+                            <div className="text-2xl font-bold">€{totalValue.toFixed(0)}</div>
+                            <div className="text-sm opacity-90">Valore Attuale</div>
+                        </div>
+                        <div className="stat-card rounded-xl p-6 shadow-lg animate-slide-in" style={{animationDelay: '0.2s'}}>
+                            <div className="text-3xl mb-2"><i className="fas fa-chart-line"></i></div>
+                            <div className="text-2xl font-bold">€{totalReturn.toFixed(0)}</div>
+                            <div className="text-sm opacity-90">Rendimento</div>
+                        </div>
+                        <div className="stat-card rounded-xl p-6 shadow-lg animate-slide-in" style={{animationDelay: '0.3s'}}>
+                            <div className="text-3xl mb-2"><i className="fas fa-percentage"></i></div>
+                            <div className="text-2xl font-bold">{returnPercentage.toFixed(1)}%</div>
+                            <div className="text-sm opacity-90">ROI</div>
+                        </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="card rounded-2xl p-2 mb-6 shadow-xl flex gap-2">
+                        <button 
+                            onClick={() => setActiveTab('cellar')}
+                            className={`tab-button flex-1 py-3 px-6 rounded-xl font-semibold transition-all ${activeTab === 'cellar' ? 'active' : 'hover:bg-gray-100'}`}
+                        >
+                            <i className="fas fa-warehouse mr-2"></i>
+                            Cantina
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('search')}
+                            className={`tab-button flex-1 py-3 px-6 rounded-xl font-semibold transition-all ${activeTab === 'search' ? 'active' : 'hover:bg-gray-100'}`}
+                        >
+                            <i className="fas fa-search mr-2"></i>
+                            Cerca Bottiglie
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('favorites')}
+                            className={`tab-button flex-1 py-3 px-6 rounded-xl font-semibold transition-all ${activeTab === 'favorites' ? 'active' : 'hover:bg-gray-100'}`}
+                        >
+                            <i className="fas fa-heart mr-2"></i>
+                            Preferiti ({favorites.length})
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="card rounded-2xl p-6 shadow-2xl min-h-[500px]">
+                        {activeTab === 'cellar' && (
+                            <CellarView 
+                                cellar={cellar} 
+                                removeFromCellar={removeFromCellar}
+                                updateQuantity={updateQuantity}
+                                getPairings={getPairingsSuggestions}
+                            />
+                        )}
+                        {activeTab === 'search' && (
+                            <SearchView 
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                selectedCategory={selectedCategory}
+                                setSelectedCategory={setSelectedCategory}
+                                handleSearch={handleSearch}
+                                searchResults={searchResults}
+                                addToCellar={addToCellar}
+                                toggleFavorite={toggleFavorite}
+                                isFavorite={isFavorite}
+                            />
+                        )}
+                        {activeTab === 'favorites' && (
+                            <FavoritesView 
+                                favorites={favorites}
+                                toggleFavorite={toggleFavorite}
+                                addToCellar={addToCellar}
+                            />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function CellarView({ cellar, removeFromCellar, updateQuantity, getPairings }) {
+            const [selectedBottle, setSelectedBottle] = useState(null);
+
+            if (cellar.length === 0) {
+                return (
+                    <div className="text-center py-20">
+                        <div className="text-6xl mb-4 text-gray-300">
+                            <i className="fas fa-wine-bottle"></i>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-400 mb-2">Cantina vuota</h3>
+                        <p className="text-gray-500">Inizia ad aggiungere bottiglie dalla ricerca!</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6 flex items-center">
+                        <i className="fas fa-warehouse mr-3 text-purple-600"></i>
+                        La Mia Cantina
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {cellar.map(bottle => (
+                            <div key={bottle.cellarId} className="bottle-card bg-white rounded-xl p-6 shadow-lg">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className={`category-badge ${bottle.category}`}>
+                                        {bottle.category.toUpperCase()}
+                                    </span>
+                                    <button 
+                                        onClick={() => removeFromCellar(bottle.cellarId)}
+                                        className="text-red-500 hover:text-red-700"
+                                    >
+                                        <i className="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                
+                                <div className="mb-4">
+                                    <img 
+                                        src={bottle.image} 
+                                        alt={bottle.name}
+                                        className="w-full h-40 object-contain mb-3"
+                                    />
+                                    <h3 className="font-bold text-lg mb-1">{bottle.name}</h3>
+                                    <p className="text-sm text-gray-600">{bottle.producer}</p>
+                                    <p className="text-xs text-gray-500">{bottle.region}, {bottle.country}</p>
+                                </div>
+
+                                <div className="border-t pt-4 space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Quantità:</span>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => updateQuantity(bottle.cellarId, -1)}
+                                                className="w-6 h-6 rounded bg-gray-200 hover:bg-gray-300"
+                                            >-</button>
+                                            <span className="font-bold">{bottle.quantity}</span>
+                                            <button 
+                                                onClick={() => updateQuantity(bottle.cellarId, 1)}
+                                                className="w-6 h-6 rounded bg-purple-500 hover:bg-purple-600 text-white"
+                                            >+</button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Prezzo acquisto:</span>
+                                        <span className="font-semibold">€{bottle.purchasePrice.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Valore attuale:</span>
+                                        <span className="font-semibold text-green-600">€{bottle.currentPrice.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Rendimento:</span>
+                                        <span className="font-bold text-green-600">
+                                            +€{((bottle.currentPrice - bottle.purchasePrice) * bottle.quantity).toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Location:</span>
+                                        <span className="text-sm">{bottle.location}</span>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => setSelectedBottle(bottle)}
+                                    className="mt-4 w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 rounded-lg hover:shadow-lg transition-all"
+                                >
+                                    <i className="fas fa-utensils mr-2"></i>
+                                    Abbinamenti
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Modal Abbinamenti */}
+                    {selectedBottle && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBottle(null)}>
+                            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-2xl font-bold mb-4">
+                                    <i className="fas fa-utensils mr-2 text-purple-600"></i>
+                                    Abbinamenti per {selectedBottle.name}
+                                </h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <h4 className="font-semibold mb-2 text-lg">🍽️ Degustazione</h4>
+                                        <ul className="list-disc list-inside text-gray-700 space-y-1">
+                                            {getPairings(selectedBottle).map((pairing, i) => (
+                                                <li key={i}>{pairing}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold mb-2 text-lg">🥂 Temperatura di servizio</h4>
+                                        <p className="text-gray-700">
+                                            {selectedBottle.category === 'wine' ? '16-18°C' : '18-20°C'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold mb-2 text-lg">📝 Note</h4>
+                                        <p className="text-gray-700">{selectedBottle.description}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setSelectedBottle(null)}
+                                    className="mt-6 w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg transition-all"
+                                >
+                                    Chiudi
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function SearchView({ searchQuery, setSearchQuery, selectedCategory, setSelectedCategory, handleSearch, searchResults, addToCellar, toggleFavorite, isFavorite }) {
+            const [selectedBottle, setSelectedBottle] = useState(null);
+            const [purchasePrice, setPurchasePrice] = useState('');
+            const [quantity, setQuantity] = useState(1);
+
+            const categories = [
+                { value: 'wine', label: 'Vino', icon: 'wine-glass-alt' },
+                { value: 'whisky', label: 'Whisky', icon: 'glass-whiskey' },
+                { value: 'scotch', label: 'Scotch', icon: 'glass-whiskey' },
+                { value: 'rum', label: 'Rum', icon: 'cocktail' },
+                { value: 'gin', label: 'Gin', icon: 'wine-bottle' }
+            ];
+
+            const handleAddToCellar = () => {
+                if (selectedBottle && purchasePrice) {
+                    addToCellar(selectedBottle, purchasePrice, quantity);
+                    setSelectedBottle(null);
+                    setPurchasePrice('');
+                    setQuantity(1);
+                }
+            };
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6 flex items-center">
+                        <i className="fas fa-search mr-3 text-purple-600"></i>
+                        Cerca Bottiglie
+                    </h2>
+
+                    {/* Category Selection */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-semibold mb-2">Categoria</label>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.value}
+                                    onClick={() => setSelectedCategory(cat.value)}
+                                    className={`p-4 rounded-xl border-2 transition-all ${
+                                        selectedCategory === cat.value 
+                                            ? 'border-purple-500 bg-purple-50' 
+                                            : 'border-gray-200 hover:border-purple-300'
+                                    }`}
+                                >
+                                    <i className={`fas fa-${cat.icon} text-2xl mb-2 ${selectedCategory === cat.value ? 'text-purple-600' : 'text-gray-400'}`}></i>
+                                    <div className="font-semibold">{cat.label}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="mb-6">
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                placeholder="Cerca per nome, produttore, regione..."
+                                className="flex-1 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                            />
+                            <button 
+                                onClick={handleSearch}
+                                className="px-8 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+                            >
+                                <i className="fas fa-search mr-2"></i>
+                                Cerca
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                            <i className="fas fa-info-circle mr-1"></i>
+                            Le API Vivino e spirits verranno integrate qui
+                        </p>
+                    </div>
+
+                    {/* Results */}
+                    {searchResults.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {searchResults.map(bottle => (
+                                <div key={bottle.id} className="bottle-card bg-white rounded-xl p-6 shadow-lg">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <span className={`category-badge ${bottle.category}`}>
+                                            {bottle.category.toUpperCase()}
+                                        </span>
+                                        <button 
+                                            onClick={() => toggleFavorite(bottle)}
+                                            className={`text-2xl ${isFavorite(bottle.id) ? 'text-red-500' : 'text-gray-300'} hover:text-red-500 transition-colors`}
+                                        >
+                                            <i className={`${isFavorite(bottle.id) ? 'fas' : 'far'} fa-heart`}></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <img 
+                                        src={bottle.image} 
+                                        alt={bottle.name}
+                                        className="w-full h-40 object-contain mb-3"
+                                    />
+                                    
+                                    <h3 className="font-bold text-lg mb-1">{bottle.name}</h3>
+                                    <p className="text-sm text-gray-600 mb-1">{bottle.producer}</p>
+                                    <p className="text-xs text-gray-500 mb-3">{bottle.region}, {bottle.country}</p>
+                                    
+                                    <div className="flex items-center mb-3">
+                                        <div className="flex text-yellow-400 mr-2">
+                                            {[...Array(5)].map((_, i) => (
+                                                <i key={i} className={`fas fa-star ${i < Math.floor(bottle.rating) ? '' : 'opacity-30'}`}></i>
+                                            ))}
+                                        </div>
+                                        <span className="text-sm font-semibold">{bottle.rating}</span>
+                                    </div>
+                                    
+                                    <p className="text-sm text-gray-600 mb-4">{bottle.description}</p>
+                                    
+                                    <button 
+                                        onClick={() => setSelectedBottle(bottle)}
+                                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:shadow-lg transition-all font-semibold"
+                                    >
+                                        <i className="fas fa-plus mr-2"></i>
+                                        Aggiungi alla Cantina
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Modal Add to Cellar */}
+                    {selectedBottle && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBottle(null)}>
+                            <div className="bg-white rounded-2xl p-8 max-w-md w-full" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-2xl font-bold mb-4">Aggiungi alla Cantina</h3>
+                                <div className="mb-4">
+                                    <p className="font-semibold">{selectedBottle.name}</p>
+                                    <p className="text-sm text-gray-600">{selectedBottle.producer}</p>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-2">Prezzo di acquisto (€)</label>
+                                        <input
+                                            type="number"
+                                            value={purchasePrice}
+                                            onChange={(e) => setPurchasePrice(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-2">Quantità</label>
+                                        <input
+                                            type="number"
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                            min="1"
+                                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button 
+                                        onClick={() => setSelectedBottle(null)}
+                                        className="flex-1 bg-gray-200 hover:bg-gray-300 py-3 rounded-lg transition-all"
+                                    >
+                                        Annulla
+                                    </button>
+                                    <button 
+                                        onClick={handleAddToCellar}
+                                        className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:shadow-lg transition-all"
+                                        disabled={!purchasePrice}
+                                    >
+                                        Aggiungi
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function FavoritesView({ favorites, toggleFavorite, addToCellar }) {
+            if (favorites.length === 0) {
+                return (
+                    <div className="text-center py-20">
+                        <div className="text-6xl mb-4 text-gray-300">
+                            <i className="far fa-heart"></i>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-400 mb-2">Nessun preferito</h3>
+                        <p className="text-gray-500">Aggiungi bottiglie ai preferiti dalla ricerca!</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6 flex items-center">
+                        <i className="fas fa-heart mr-3 text-red-500"></i>
+                        I Miei Preferiti
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {favorites.map(bottle => (
+                            <div key={bottle.id} className="bottle-card bg-white rounded-xl p-6 shadow-lg">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className={`category-badge ${bottle.category}`}>
+                                        {bottle.category.toUpperCase()}
+                                    </span>
+                                    <button 
+                                        onClick={() => toggleFavorite(bottle)}
+                                        className="text-2xl text-red-500 hover:text-red-700"
+                                    >
+                                        <i className="fas fa-heart"></i>
+                                    </button>
+                                </div>
+                                
+                                <img 
+                                    src={bottle.image} 
+                                    alt={bottle.name}
+                                    className="w-full h-40 object-contain mb-3"
+                                />
+                                
+                                <h3 className="font-bold text-lg mb-1">{bottle.name}</h3>
+                                <p className="text-sm text-gray-600 mb-1">{bottle.producer}</p>
+                                <p className="text-xs text-gray-500 mb-3">{bottle.region}, {bottle.country}</p>
+                                
+                                <div className="flex items-center mb-3">
+                                    <div className="flex text-yellow-400 mr-2">
+                                        {[...Array(5)].map((_, i) => (
+                                            <i key={i} className={`fas fa-star ${i < Math.floor(bottle.rating) ? '' : 'opacity-30'}`}></i>
+                                        ))}
+                                    </div>
+                                    <span className="text-sm font-semibold">{bottle.rating}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
